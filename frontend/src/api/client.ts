@@ -1,0 +1,79 @@
+import axios, {
+  AxiosError,
+  AxiosHeaders,
+  type InternalAxiosRequestConfig,
+} from "axios";
+import { tokenStore } from "../auth/authStore";
+
+const baseURL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+export const api = axios.create({ baseURL });
+
+// Separate client without interceptors for refresh
+const raw = axios.create({ baseURL });
+
+type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+// If your backend expects "JWT <token>" instead of "Bearer <token>",
+// change Bearer to JWT here.
+const AUTH_SCHEME = "Bearer";
+
+function setAuthHeader(config: InternalAxiosRequestConfig, accessToken: string) {
+  const value = `${AUTH_SCHEME} ${accessToken}`;
+
+  // Axios v1 prefers AxiosHeaders internally, but it can be plain object too.
+  if (!config.headers) {
+    config.headers = new AxiosHeaders();
+  }
+
+  if (config.headers instanceof AxiosHeaders) {
+    config.headers.set("Authorization", value);
+    return;
+  }
+
+  // Plain object headers fallback
+  (config.headers as Record<string, string>)["Authorization"] = value;
+}
+
+api.interceptors.request.use((config) => {
+  const tokens = tokenStore.get();
+  if (tokens?.access) setAuthHeader(config, tokens.access);
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error: AxiosError<unknown>) => {
+    const cfg = error.config as RetryConfig | undefined;
+    if (!cfg) return Promise.reject(error);
+
+    // Retry once on 401 by refreshing access token
+    if (error.response?.status === 401 && !cfg._retry) {
+      cfg._retry = true;
+
+      const tokens = tokenStore.get();
+      const refresh = tokens?.refresh;
+
+      if (refresh) {
+        try {
+          const r = await raw.post("/api/auth/refresh/", { refresh });
+          const newAccess = (r.data as { access?: string }).access;
+
+          if (newAccess) {
+            tokenStore.set({ access: newAccess, refresh });
+            setAuthHeader(cfg, newAccess);
+            return api.request(cfg);
+          }
+        } catch {
+          // refresh failed, fall through to logout
+        }
+      }
+
+      tokenStore.clear();
+      window.location.assign("/login");
+      return Promise.reject(error);
+    }
+
+    return Promise.reject(error);
+  }
+);

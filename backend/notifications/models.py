@@ -8,6 +8,7 @@ class Notification(models.Model):
         ASSET_ASSIGNED = "ASSET_ASSIGNED", "Asset assigned"
         TICKET_CREATED = "TICKET_CREATED", "Ticket created"
         TICKET_UPDATED = "TICKET_UPDATED", "Ticket updated"
+        TICKET_RESOLVED = "TICKET_RESOLVED", "Ticket resolved"
         ASSIGNMENT_RETURNED = "ASSIGNMENT_RETURNED", "Assignment returned"
 
     user = models.ForeignKey(

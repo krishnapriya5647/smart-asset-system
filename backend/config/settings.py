@@ -142,7 +142,11 @@ CSRF_TRUSTED_ORIGIN_REGEXES = [
 # If you're testing locally now, keep these in Render env too:
 # http://localhost:5173,http://127.0.0.1:5173
 CORS_ALLOW_CREDENTIALS = True
+from corsheaders.defaults import default_headers
 
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "authorization",
+]
 PASSWORD_RESET_TIMEOUT = 60 * 60
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

@@ -46,10 +46,12 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -81,7 +83,6 @@ DATABASES = {
     "default": dj_database_url.config(
         default=os.getenv("DATABASE_URL", ""),
         conn_max_age=600,
-        ssl_require=True,
     )
 }
 
@@ -125,23 +126,17 @@ MEDIA_ROOT = BASE_DIR / "media"
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # CORS
-cors_env = os.getenv("CORS_ALLOWED_ORIGINS", "")
 CORS_ALLOWED_ORIGINS = [
     "https://smart-asset-andinventorysystem.vercel.app",
 ]
+
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",
 ]
-CSRF_TRUSTED_ORIGINS = [
-    "https://smart-asset-andinventorysystem.vercel.app",
-]
-CSRF_TRUSTED_ORIGIN_REGEXES = [
-    r"^https://.*\.vercel\.app$",
-]
 
+CORS_ALLOW_CREDENTIALS = False
 # If you're testing locally now, keep these in Render env too:
 # http://localhost:5173,http://127.0.0.1:5173
-CORS_ALLOW_CREDENTIALS = True
 from corsheaders.defaults import default_headers
 
 CORS_ALLOW_HEADERS = list(default_headers) + [

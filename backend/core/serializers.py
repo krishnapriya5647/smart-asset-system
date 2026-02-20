@@ -1,3 +1,5 @@
+# backend/core/serializers.py
+
 from rest_framework import serializers
 from .models import Asset, InventoryItem, Assignment, RepairTicket
 from accounts.serializers import UserPublicSerializer
@@ -17,11 +19,32 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
 class AssignmentSerializer(serializers.ModelSerializer):
     asset_detail = AssetSerializer(source="asset", read_only=True)
+
+    # convenience fields
     employee_username = serializers.ReadOnlyField(source="employee.username")
+
+    # new detail fields (safe even if null)
+    employee_detail = UserPublicSerializer(source="employee", read_only=True)
+    returned_by_detail = UserPublicSerializer(source="returned_by", read_only=True)
 
     class Meta:
         model = Assignment
         fields = "__all__"
+        # These should be server-controlled
+        read_only_fields = (
+            "return_requested_at",
+            "returned_at",
+            "returned_by",
+        )
+
+    def validate(self, attrs):
+        """
+        Optional: validate return_note type if present.
+        """
+        note = attrs.get("return_note")
+        if note is not None and not isinstance(note, str):
+            raise serializers.ValidationError({"return_note": "Must be a string."})
+        return attrs
 
 
 class RepairTicketSerializer(serializers.ModelSerializer):
@@ -91,7 +114,23 @@ class RecentTicketSerializer(serializers.ModelSerializer):
 
 class RecentAssignmentSerializer(serializers.ModelSerializer):
     asset_detail = AssetSerializer(source="asset", read_only=True)
+    employee_detail = UserPublicSerializer(source="employee", read_only=True)
+    returned_by_detail = UserPublicSerializer(source="returned_by", read_only=True)
 
     class Meta:
         model = Assignment
-        fields = ["id", "asset", "asset_detail", "employee", "date_assigned", "date_returned"]
+        fields = [
+            "id",
+            "asset",
+            "asset_detail",
+            "employee",
+            "employee_detail",
+            "date_assigned",
+            "date_returned",
+            "status",
+            "return_requested_at",
+            "return_note",
+            "returned_at",
+            "returned_by",
+            "returned_by_detail",
+        ]

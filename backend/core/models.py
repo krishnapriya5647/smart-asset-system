@@ -29,14 +29,36 @@ class InventoryItem(models.Model):
 
 
 class Assignment(models.Model):
+    class Status(models.TextChoices):
+        ASSIGNED = "ASSIGNED", "Assigned"
+        RETURN_REQUESTED = "RETURN_REQUESTED", "Return Requested"
+        RETURNED = "RETURNED", "Returned"
+
     asset = models.ForeignKey(Asset, on_delete=models.PROTECT, related_name="assignments")
-    employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="asset_assignments")
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="asset_assignments"
+    )
+
     date_assigned = models.DateField()
+
+    # Old field (keep it)
     date_returned = models.DateField(null=True, blank=True)
+
+    # New fields
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ASSIGNED)
+    return_requested_at = models.DateTimeField(null=True, blank=True)
+    return_note = models.TextField(blank=True, default="")
+    returned_at = models.DateTimeField(null=True, blank=True)
+    returned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="assignments_returned_by",
+    )
 
     class Meta:
         ordering = ["-date_assigned"]
-
 
 class RepairTicket(models.Model):
     class Status(models.TextChoices):

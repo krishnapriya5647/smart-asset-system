@@ -1,6 +1,6 @@
 // frontend/src/pages/Assignments.tsx
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
@@ -16,12 +16,15 @@ import {
   Chip,
   useMediaQuery,
   useTheme,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import {
   DataGrid,
   type GridColDef,
   type GridRowParams,
   type GridPaginationModel,
+  type GridRenderCellParams,
   useGridApiRef,
 } from "@mui/x-data-grid";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -49,6 +52,17 @@ type Assignment = {
   employee_detail?: User;
 };
 
+type Notification = {
+  id: number;
+  title?: string;
+  message?: string;
+  notif_type?: string;
+  entity_type?: string;
+  entity_id?: number;
+  is_read?: boolean;
+  created_at?: string;
+};
+
 function unwrapList<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
   if (typeof data === "object" && data !== null) {
@@ -66,6 +80,23 @@ function ymd(s?: string | null) {
 
 type ReturnFilter = "ALL" | "RETURNED" | "NOT_RETURNED";
 
+function extractErrMessage(err: unknown) {
+  if (err instanceof Error && err.message.trim()) return err.message;
+
+  if (typeof err === "object" && err !== null) {
+    const e = err as Record<string, unknown>;
+    const m = e["message"];
+    if (typeof m === "string" && m.trim()) return m;
+  }
+
+  return "Request failed. Please check backend and try again.";
+}
+
+function looksLikeReturnNotification(n: Notification) {
+  const blob = `${n.notif_type ?? ""} ${n.title ?? ""} ${n.message ?? ""}`.toLowerCase();
+  return blob.includes("return");
+}
+
 export default function Assignments() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -75,7 +106,6 @@ export default function Assignments() {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // Parse params without useMemo
   const focusParam = searchParams.get("focus");
   const focusNum = focusParam ? Number(focusParam) : NaN;
   const focusId = Number.isFinite(focusNum) ? focusNum : null;
@@ -101,6 +131,23 @@ export default function Assignments() {
     enabled: !!isAdmin,
     queryFn: async () => unwrapList<User>((await api.get("/api/users/")).data),
   });
+
+  const { data: notifications } = useQuery({
+    queryKey: ["notifications"],
+    enabled: !!isAdmin,
+    queryFn: async () => unwrapList<Notification>((await api.get("/api/notifications/")).data),
+  });
+
+  const pendingReturnByAssignment = useMemo(() => {
+    const set = new Set<number>();
+    for (const n of notifications ?? []) {
+      if (n.is_read) continue;
+      if (typeof n.entity_id !== "number") continue;
+      if (!looksLikeReturnNotification(n)) continue;
+      set.add(n.entity_id);
+    }
+    return set;
+  }, [notifications]);
 
   const assignmentsUrl =
     isAdmin && employeeParam ? `/api/assignments/?employee=${employeeParam}` : "/api/assignments/";
@@ -140,6 +187,12 @@ export default function Assignments() {
     pageSize: 10,
   });
 
+  const [toast, setToast] = useState<{ open: boolean; msg: string; severity: "success" | "error" }>({
+    open: false,
+    msg: "",
+    severity: "success",
+  });
+
   const createMut = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -153,7 +206,9 @@ export default function Assignments() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["assignments"] });
       closeForm();
+      setToast({ open: true, msg: "Assignment created", severity: "success" });
     },
+    onError: (e) => setToast({ open: true, msg: extractErrMessage(e), severity: "error" }),
   });
 
   const updateMut = useMutation({
@@ -170,14 +225,57 @@ export default function Assignments() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["assignments"] });
       closeForm();
+      setToast({ open: true, msg: "Assignment updated", severity: "success" });
     },
+    onError: (e) => setToast({ open: true, msg: extractErrMessage(e), severity: "error" }),
   });
 
   const deleteMut = useMutation({
     mutationFn: async (id: number) => api.delete(`/api/assignments/${id}/`),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["assignments"] });
+      setToast({ open: true, msg: "Assignment deleted", severity: "success" });
     },
+    onError: (e) => setToast({ open: true, msg: extractErrMessage(e), severity: "error" }),
+  });
+
+  // Employee: Mark returned (send notification to admin)
+  const requestReturnMut = useMutation({
+    mutationFn: async (assignmentId: number) => api.post(`/api/assignments/${assignmentId}/request-return/`, {}),
+    onSuccess: async () => {
+      setToast({
+        open: true,
+        msg: "Marked returned. Sent to admin for approval",
+        severity: "success",
+      });
+      await qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: (e) => setToast({ open: true, msg: extractErrMessage(e), severity: "error" }),
+  });
+
+  // Admin: Approve return (use backend confirm endpoint)
+  const approveReturnMut = useMutation<unknown, unknown, Assignment>({
+    mutationFn: async (row: Assignment) => {
+      return api.post(`/api/assignments/${row.id}/confirm-return/`, {});
+    },
+    onSuccess: async (_data, row) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["assignments"] }),
+        qc.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+
+      const notifs = (notifications ?? [])
+        .filter((n) => !n.is_read)
+        .filter((n) => typeof n.entity_id === "number" && n.entity_id === row.id)
+        .filter((n) => looksLikeReturnNotification(n));
+
+      await Promise.all(
+        notifs.map((n) => api.patch(`/api/notifications/${n.id}/`, { read: true }).catch(() => null))
+      );
+
+      setToast({ open: true, msg: "Return approved", severity: "success" });
+    },
+    onError: (e) => setToast({ open: true, msg: extractErrMessage(e), severity: "error" }),
   });
 
   function openCreate() {
@@ -340,40 +438,91 @@ export default function Assignments() {
       width: 150,
       valueGetter: (_v, r) => (r.date_returned ? ymd(r.date_returned) : "Not returned"),
     },
+
+    ...(!isAdmin
+      ? ([
+          {
+            field: "employee_actions",
+            headerName: "Actions",
+            width: isXs ? 220 : 260,
+            sortable: false,
+            filterable: false,
+            renderCell: (params: GridRenderCellParams<Assignment>) => {
+              const row = params.row;
+              const disabled = !!row.date_returned || requestReturnMut.isPending;
+              return (
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={disabled}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      requestReturnMut.mutate(row.id);
+                    }}
+                  >
+                    Mark returned
+                  </Button>
+                </Stack>
+              );
+            },
+          },
+        ] as GridColDef<Assignment>[])
+      : []),
+
     ...(isAdmin
       ? ([
           {
             field: "actions",
             headerName: "Actions",
-            width: isXs ? 200 : 260,
+            width: isXs ? 320 : 380,
             sortable: false,
             filterable: false,
-            renderCell: (params) => (
-              <Stack direction="row" spacing={1}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openEdit(params.row);
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="small"
-                  color="error"
-                  variant="outlined"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    deleteMut.mutate(params.row.id);
-                  }}
-                  disabled={deleteMut.isPending}
-                >
-                  Delete
-                </Button>
-              </Stack>
-            ),
+            renderCell: (params: GridRenderCellParams<Assignment>) => {
+              const row = params.row;
+              const hasPending = pendingReturnByAssignment.has(row.id);
+              const canApprove = !row.date_returned && hasPending;
+
+              return (
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openEdit(row);
+                    }}
+                  >
+                    Edit
+                  </Button>
+
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={!canApprove || approveReturnMut.isPending}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      approveReturnMut.mutate(row);
+                    }}
+                  >
+                    Approve return
+                  </Button>
+
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      deleteMut.mutate(row.id);
+                    }}
+                    disabled={deleteMut.isPending}
+                  >
+                    Delete
+                  </Button>
+                </Stack>
+              );
+            },
           },
         ] as GridColDef<Assignment>[])
       : []),
@@ -544,6 +693,21 @@ export default function Assignments() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3500}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={toast.severity}
+          onClose={() => setToast((t) => ({ ...t, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {toast.msg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -81,18 +81,21 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         return qs.filter(employee=user)
 
     def get_permissions(self):
+        # everyone authenticated can read their assignments (admin can read all)
         if self.request.method in ["GET", "HEAD", "OPTIONS"]:
             return [IsAuthenticated()]
+        # only admin can create/update/delete
         return [AdminWriteElseReadOnly()]
 
     def perform_create(self, serializer):
         assignment = serializer.save()
 
-        # Optional: mark asset as assigned
+        # keep asset status in sync
         if assignment.asset_id:
             Asset.objects.filter(id=assignment.asset_id).update(status=Asset.Status.ASSIGNED)
 
-        if assignment.employee and assignment.asset:
+        # notify employee
+        if assignment.employee_id and assignment.asset_id:
             Notification.objects.create(
                 user=assignment.employee,
                 notif_type=Notification.Type.ASSET_ASSIGNED,
@@ -104,8 +107,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         """
-        Admin updates assignment. If admin marks return via date_returned/status,
-        sync asset status + notify employee.
+        Admin updates assignment.
+        If admin marks returned (date_returned set), sync asset status + notify employee.
+        Also handles employee change notifications.
         """
         old = self.get_object()
         assignment = serializer.save()
@@ -116,12 +120,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         old_return = getattr(old, "date_returned", None)
         new_return = getattr(assignment, "date_returned", None)
 
-        old_status = getattr(old, "status", None)
-        new_status = getattr(assignment, "status", None)
-
         asset = assignment.asset
 
-        # Employee changed
+        # employee changed, notify new employee
         if new_emp_id and new_emp_id != old_emp_id:
             Notification.objects.create(
                 user=assignment.employee,
@@ -132,29 +133,13 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 entity_id=assignment.id,
             )
 
-        # If admin marked returned (either by setting date_returned or status)
-        marked_returned = False
-
-        # Case 1: date_returned set now
-        if old_return is None and new_return is not None:
-            marked_returned = True
-
-        # Case 2: status changed to RETURNED
-        if (
-            hasattr(Assignment, "Status")
-            and new_status == Assignment.Status.RETURNED
-            and old_status != new_status
-        ):
-            marked_returned = True
-            if assignment.date_returned is None:
-                assignment.date_returned = timezone.now().date()
-                assignment.save(update_fields=["date_returned"])
-
-        if marked_returned and assignment.employee_id:
-            # Mark asset available again
+        # returned just now (date_returned changed from null to a date)
+        if old_return is None and new_return is not None and assignment.employee_id:
+            # mark asset as available again
             if assignment.asset_id:
                 Asset.objects.filter(id=assignment.asset_id).update(status=Asset.Status.AVAILABLE)
 
+            # notify employee (your existing behavior)
             Notification.objects.create(
                 user=assignment.employee,
                 notif_type=Notification.Type.ASSIGNMENT_RETURNED,
@@ -167,7 +152,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="request-return", permission_classes=[IsAuthenticated])
     def request_return(self, request, pk=None):
         """
-        Employee requests return. Admin will later confirm.
+        Employee requests admin to mark an assignment as returned.
+        Does NOT modify date_returned (admin confirms later).
         """
         assignment = self.get_object()
         user = request.user
@@ -178,45 +164,28 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if assignment.employee_id != user.id:
             raise PermissionDenied("You can only request return for your own assignment")
 
-        # If already returned, block
         if assignment.date_returned is not None:
-            return Response({"detail": "Already returned"}, status=status.HTTP_400_BAD_REQUEST)
-
-        if hasattr(Assignment, "Status") and getattr(assignment, "status", None) == Assignment.Status.RETURNED:
             return Response({"detail": "Already returned"}, status=status.HTTP_400_BAD_REQUEST)
 
         note = (request.data.get("note") or "").strip()
 
-        # Update fields only if they exist in model
-        update_fields = []
-        if hasattr(Assignment, "Status") and hasattr(assignment, "status"):
-            assignment.status = Assignment.Status.RETURN_REQUESTED
-            update_fields.append("status")
-
-        if hasattr(assignment, "return_requested_at"):
-            assignment.return_requested_at = timezone.now()
-            update_fields.append("return_requested_at")
-
-        if hasattr(assignment, "return_note"):
-            assignment.return_note = note
-            update_fields.append("return_note")
-
-        if update_fields:
-            assignment.save(update_fields=update_fields)
-
-        # Notify admins
         asset = assignment.asset
-        admins = User.objects.filter(role="ADMIN")
-
-        msg = f"{user.username} requested return for {asset.name} ({asset.serial_number})."
+        asset_label = f"{asset.name} ({asset.serial_number})"
+        msg = f"{user.username} requested return for {asset_label}."
         if note:
             msg += f" Note: {note}"
 
+        admins = User.objects.filter(role="ADMIN")
+        if not admins.exists():
+            return Response({"detail": "No admin users found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Reuse an existing notif_type to avoid changing your Notification.Type enum.
+        # If you later add a dedicated type like RETURN_REQUESTED, replace this.
         Notification.objects.bulk_create(
             [
                 Notification(
                     user=admin,
-                    notif_type=Notification.Type.TICKET_UPDATED,
+                    notif_type=Notification.Type.ASSIGNMENT_RETURNED,
                     title="Return requested",
                     message=msg,
                     entity_type="assignment",
@@ -226,12 +195,13 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             ]
         )
 
+        assignment.refresh_from_db()
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="confirm-return", permission_classes=[IsAuthenticated])
     def confirm_return(self, request, pk=None):
         """
-        Admin confirms return, marks date_returned, sets asset AVAILABLE, notifies employee.
+        Admin confirms return and sets date_returned.
         """
         assignment = self.get_object()
         user = request.user
@@ -242,32 +212,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if assignment.date_returned is not None:
             return Response({"detail": "Already returned"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if hasattr(Assignment, "Status") and getattr(assignment, "status", None) == Assignment.Status.RETURNED:
-            return Response({"detail": "Already returned"}, status=status.HTTP_400_BAD_REQUEST)
+        assignment.date_returned = timezone.now().date()
+        assignment.save(update_fields=["date_returned"])
 
-        now = timezone.now()
-
-        # keep old field
-        assignment.date_returned = now.date()
-
-        update_fields = ["date_returned"]
-
-        # new fields if present
-        if hasattr(Assignment, "Status") and hasattr(assignment, "status"):
-            assignment.status = Assignment.Status.RETURNED
-            update_fields.append("status")
-
-        if hasattr(assignment, "returned_at"):
-            assignment.returned_at = now
-            update_fields.append("returned_at")
-
-        if hasattr(assignment, "returned_by"):
-            assignment.returned_by = user
-            update_fields.append("returned_by")
-
-        assignment.save(update_fields=update_fields)
-
-        # Mark asset available
         if assignment.asset_id:
             Asset.objects.filter(id=assignment.asset_id).update(status=Asset.Status.AVAILABLE)
 
@@ -283,7 +230,6 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
         assignment.refresh_from_db()
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
-
 
 class TicketViewSet(viewsets.ModelViewSet):
     queryset = RepairTicket.objects.select_related(

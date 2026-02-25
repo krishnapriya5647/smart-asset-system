@@ -1,3 +1,5 @@
+// frontend/src/pages/AssignmentDetails.tsx
+
 import { useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import {
@@ -15,6 +17,8 @@ import {
   Stack,
   TextField,
   Typography,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -46,6 +50,17 @@ type Assignment = {
 
   asset_detail?: Asset;
   employee_username?: string;
+};
+
+type Notification = {
+  id: number;
+  title?: string;
+  message?: string;
+  notif_type?: string;
+  entity_type?: string;
+  entity_id?: number;
+  is_read?: boolean;
+  created_at?: string;
 };
 
 function unwrapList<T>(data: unknown): T[] {
@@ -96,15 +111,12 @@ function formatUser(u: User) {
   return full ? `${full} (@${u.username})` : `@${u.username}`;
 }
 
-// backend wants YYYY-MM-DD (DateField)
 function toDateValue(input?: string | null) {
   if (!input) return "";
   const s = String(input).trim();
 
-  // already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
-  // ISO or any parsable date
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return "";
 
@@ -131,18 +143,17 @@ function asApiErrorLike(err: unknown): ApiErrorLike {
   if (typeof err !== "object" || err === null) return {};
   const e = err as Record<string, unknown>;
 
-  const message = typeof e.message === "string" ? e.message : undefined;
+  const message = typeof e["message"] === "string" ? (e["message"] as string) : undefined;
 
-  let response: ApiErrorLike["response"] | undefined;
-  const r = e.response;
-  if (typeof r === "object" && r !== null) {
-    const rr = r as Record<string, unknown>;
-    const status = typeof rr.status === "number" ? rr.status : undefined;
-    const data = rr.data;
-    response = { status, data };
+  const resp = e["response"];
+  if (typeof resp === "object" && resp !== null) {
+    const rr = resp as Record<string, unknown>;
+    const status = typeof rr["status"] === "number" ? (rr["status"] as number) : undefined;
+    const data = rr["data"];
+    return { message, response: { status, data } };
   }
 
-  return { message, response };
+  return { message };
 }
 
 function extractErrMessage(err: unknown) {
@@ -164,7 +175,12 @@ function extractErrMessage(err: unknown) {
   if (e.message) return e.message;
   if (err instanceof Error && err.message) return err.message;
 
-  return "Save failed. Please check backend permissions/fields.";
+  return "Request failed. Please check backend permissions/fields.";
+}
+
+function looksLikeReturnNotification(n: Notification) {
+  const blob = `${n.notif_type ?? ""} ${n.title ?? ""} ${n.message ?? ""}`.toLowerCase();
+  return blob.includes("return");
 }
 
 function EditAssignmentDialog(props: {
@@ -194,7 +210,9 @@ function EditAssignmentDialog(props: {
       const returnedDate =
         editStatus === "ACTIVE"
           ? null
-          : (editReturnedDate && /^\d{4}-\d{2}-\d{2}$/.test(editReturnedDate) ? editReturnedDate : todayDateValue());
+          : editReturnedDate && /^\d{4}-\d{2}-\d{2}$/.test(editReturnedDate)
+            ? editReturnedDate
+            : todayDateValue();
 
       const patchPayload = {
         employee: employeeNum,
@@ -301,11 +319,7 @@ function EditAssignmentDialog(props: {
         <Button onClick={onClose} disabled={updateMut.isPending}>
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          onClick={() => updateMut.mutate()}
-          disabled={!canSave || updateMut.isPending}
-        >
+        <Button variant="contained" onClick={() => updateMut.mutate()} disabled={!canSave || updateMut.isPending}>
           {updateMut.isPending ? "Saving..." : "Save"}
         </Button>
       </DialogActions>
@@ -315,8 +329,15 @@ function EditAssignmentDialog(props: {
 
 export default function AssignmentDetails() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { id } = useParams();
   const assignmentId = Number(id);
+
+  const [toast, setToast] = useState<{ open: boolean; msg: string; severity: "success" | "error" }>({
+    open: false,
+    msg: "",
+    severity: "success",
+  });
 
   const { data: me } = useQuery({
     queryKey: ["me"],
@@ -327,6 +348,7 @@ export default function AssignmentDetails() {
 
   const { data: users } = useQuery({
     queryKey: ["users"],
+    enabled: !!isAdmin,
     queryFn: async () => unwrapList<User>((await api.get("/api/users/")).data),
   });
 
@@ -335,6 +357,29 @@ export default function AssignmentDetails() {
     enabled: Number.isFinite(assignmentId) && assignmentId > 0,
     queryFn: async () => (await api.get<Assignment>(`/api/assignments/${assignmentId}/`)).data,
   });
+
+  const { data: notifications } = useQuery({
+    queryKey: ["notifications"],
+    enabled: !!isAdmin,
+    queryFn: async () => unwrapList<Notification>((await api.get("/api/notifications/")).data),
+  });
+
+  const pendingReturnNotif = useMemo(() => {
+    if (!isAdmin) return null;
+    const list = notifications ?? [];
+    const matches = list
+      .filter((n) => !n.is_read)
+      .filter((n) => typeof n.entity_id === "number" && n.entity_id === assignmentId)
+      .filter((n) => looksLikeReturnNotification(n));
+
+    matches.sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tb - ta;
+    });
+
+    return matches[0] ?? null;
+  }, [isAdmin, notifications, assignmentId]);
 
   const assetTitle = useMemo(() => {
     if (!assignment) return "";
@@ -358,6 +403,37 @@ export default function AssignmentDetails() {
 
   const [editOpen, setEditOpen] = useState(false);
 
+  const requestReturnMut = useMutation({
+    mutationFn: async () => api.post(`/api/assignments/${assignmentId}/request-return/`, {}),
+    onSuccess: async () => {
+      setToast({ open: true, msg: "Marked returned. Sent to admin for approval", severity: "success" });
+      await qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: (e) => setToast({ open: true, msg: extractErrMessage(e), severity: "error" }),
+  });
+
+  const approveReturnMut = useMutation({
+    mutationFn: async () => api.post(`/api/assignments/${assignmentId}/confirm-return/`, {}),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["assignment", assignmentId] }),
+        qc.invalidateQueries({ queryKey: ["assignments"] }),
+        qc.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+
+      if (pendingReturnNotif?.id) {
+        try {
+          await api.patch(`/api/notifications/${pendingReturnNotif.id}/`, { read: true });
+        } catch {
+          // best effort
+        }
+      }
+
+      setToast({ open: true, msg: "Return approved", severity: "success" });
+    },
+    onError: (e) => setToast({ open: true, msg: extractErrMessage(e), severity: "error" }),
+  });
+
   if (!Number.isFinite(assignmentId) || assignmentId <= 0) {
     return (
       <Box>
@@ -370,6 +446,9 @@ export default function AssignmentDetails() {
       </Box>
     );
   }
+
+  const canEmployeeMark = !isAdmin && !!assignment && !assignment.date_returned;
+  const canAdminApprove = isAdmin && !!assignment && !assignment.date_returned && !!pendingReturnNotif;
 
   return (
     <Box>
@@ -403,24 +482,30 @@ export default function AssignmentDetails() {
             Back
           </Button>
 
-          {isAdmin && (
-            <Button
-              variant="contained"
-              onClick={() => setEditOpen(true)}
-              disabled={isLoading || isError || !assignment}
-            >
+          {canEmployeeMark ? (
+            <Button variant="contained" onClick={() => requestReturnMut.mutate()} disabled={requestReturnMut.isPending}>
+              {requestReturnMut.isPending ? "Sending..." : "Mark returned"}
+            </Button>
+          ) : null}
+
+          {canAdminApprove ? (
+            <Button variant="outlined" onClick={() => approveReturnMut.mutate()} disabled={approveReturnMut.isPending}>
+              {approveReturnMut.isPending ? "Saving..." : "Approve return"}
+            </Button>
+          ) : null}
+
+          {isAdmin ? (
+            <Button variant="contained" onClick={() => setEditOpen(true)} disabled={isLoading || isError || !assignment}>
               Edit
             </Button>
-          )}
+          ) : null}
         </Stack>
       </Stack>
 
       {isLoading ? (
         <Typography sx={{ color: "text.secondary" }}>Loading…</Typography>
       ) : isError || !assignment ? (
-        <Typography sx={{ color: "error.main" }}>
-          Could not load assignment. (Check permissions or id)
-        </Typography>
+        <Typography sx={{ color: "error.main" }}>Could not load assignment. (Check permissions or id)</Typography>
       ) : (
         <Card sx={{ borderRadius: 3 }}>
           <CardContent>
@@ -446,9 +531,7 @@ export default function AssignmentDetails() {
                 <Stack spacing={0.5}>
                   <Typography sx={{ color: "text.secondary" }}>
                     Assigned:{" "}
-                    <span style={{ color: "inherit", fontWeight: 600 }}>
-                      {fmtDate(assignment.date_assigned)}
-                    </span>
+                    <span style={{ color: "inherit", fontWeight: 600 }}>{fmtDate(assignment.date_assigned)}</span>
                   </Typography>
                   <Typography sx={{ color: "text.secondary" }}>
                     Returned:{" "}
@@ -470,9 +553,7 @@ export default function AssignmentDetails() {
 
                   <Box>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>Asset status</Typography>
-                    <Typography sx={{ fontWeight: 700 }}>
-                      {assignment.asset_detail?.status ?? "—"}
-                    </Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{assignment.asset_detail?.status ?? "—"}</Typography>
                   </Box>
                 </Stack>
               </Box>
@@ -492,6 +573,17 @@ export default function AssignmentDetails() {
           isAdmin={isAdmin}
         />
       ) : null}
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3500}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))} sx={{ width: "100%" }}>
+          {toast.msg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

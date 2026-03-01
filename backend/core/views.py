@@ -81,12 +81,16 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         return qs.filter(employee=user)
 
     def get_permissions(self):
-        # everyone authenticated can read their assignments (admin can read all)
+        # Allow authenticated users for custom actions
+        if getattr(self, "action", None) in ["request_return", "confirm_return"]:
+            return [IsAuthenticated()]
+
+        # Read operations for authenticated users
         if self.request.method in ["GET", "HEAD", "OPTIONS"]:
             return [IsAuthenticated()]
-        # only admin can create/update/delete
-        return [AdminWriteElseReadOnly()]
 
+        # Only admin can create/update/delete
+        return [AdminWriteElseReadOnly()]
     def perform_create(self, serializer):
         assignment = serializer.save()
 

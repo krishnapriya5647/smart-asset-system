@@ -138,17 +138,22 @@ export default function Assignments() {
     queryFn: async () => unwrapList<Notification>((await api.get("/api/notifications/")).data),
   });
 
-  const pendingReturnByAssignment = useMemo(() => {
-    const set = new Set<number>();
-    for (const n of notifications ?? []) {
-      if (n.is_read) continue;
-      if (typeof n.entity_id !== "number") continue;
-      if (!looksLikeReturnNotification(n)) continue;
-      set.add(n.entity_id);
-    }
-    return set;
-  }, [notifications]);
+const pendingReturnByAssignment = useMemo(() => {
+  const set = new Set<number>();
 
+  for (const n of notifications ?? []) {
+    if (n.is_read) continue;
+
+    const idNum = Number(n.entity_id);
+    if (!Number.isFinite(idNum)) continue;
+
+    if (!looksLikeReturnNotification(n)) continue;
+
+    set.add(idNum);
+  }
+
+  return set;
+}, [notifications]);
   const assignmentsUrl =
     isAdmin && employeeParam ? `/api/assignments/?employee=${employeeParam}` : "/api/assignments/";
 

@@ -64,6 +64,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
     permission_classes = [AdminWriteElseReadOnly]
 
 
+
 class AssignmentViewSet(viewsets.ModelViewSet):
     queryset = Assignment.objects.select_related("asset", "employee").all()
     serializer_class = AssignmentSerializer
@@ -81,16 +82,18 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         return qs.filter(employee=user)
 
     def get_permissions(self):
-        # Allow authenticated users for custom actions
+        # Always allow authenticated users to hit these custom actions,
+        # the action itself will enforce admin/employee rules.
         if getattr(self, "action", None) in ["request_return", "confirm_return"]:
             return [IsAuthenticated()]
 
-        # Read operations for authenticated users
+        # everyone authenticated can read their assignments (admin can read all)
         if self.request.method in ["GET", "HEAD", "OPTIONS"]:
             return [IsAuthenticated()]
 
-        # Only admin can create/update/delete
+        # only admin can create/update/delete
         return [AdminWriteElseReadOnly()]
+
     def perform_create(self, serializer):
         assignment = serializer.save()
 
@@ -143,7 +146,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             if assignment.asset_id:
                 Asset.objects.filter(id=assignment.asset_id).update(status=Asset.Status.AVAILABLE)
 
-            # notify employee (your existing behavior)
+            # notify employee
             Notification.objects.create(
                 user=assignment.employee,
                 notif_type=Notification.Type.ASSIGNMENT_RETURNED,
@@ -153,7 +156,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 entity_id=assignment.id,
             )
 
-    @action(detail=True, methods=["post"], url_path="request-return", permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="request-return")
     def request_return(self, request, pk=None):
         """
         Employee requests admin to mark an assignment as returned.
@@ -183,8 +186,6 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if not admins.exists():
             return Response({"detail": "No admin users found"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Reuse an existing notif_type to avoid changing your Notification.Type enum.
-        # If you later add a dedicated type like RETURN_REQUESTED, replace this.
         Notification.objects.bulk_create(
             [
                 Notification(
@@ -202,7 +203,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         assignment.refresh_from_db()
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"], url_path="confirm-return", permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="confirm-return")
     def confirm_return(self, request, pk=None):
         """
         Admin confirms return and sets date_returned.
@@ -234,7 +235,6 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
         assignment.refresh_from_db()
         return Response(self.get_serializer(assignment).data, status=status.HTTP_200_OK)
-
 class TicketViewSet(viewsets.ModelViewSet):
     queryset = RepairTicket.objects.select_related(
         "asset", "assigned_technician", "created_by", "resolved_by"

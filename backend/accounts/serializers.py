@@ -5,9 +5,9 @@ from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import serializers
-
+import logging
 from .models import User
-
+logger = logging.getLogger(__name__)
 
 class UserPublicSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
@@ -35,6 +35,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):
         fields = ["first_name", "last_name", "email"]
 
 
+
 class PasswordResetRequestSerializer(serializers.Serializer):
     email_or_username = serializers.CharField()
 
@@ -42,14 +43,11 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         value = self.validated_data["email_or_username"].strip()
         request = self.context.get("request")
 
-        user = None
-
         if "@" in value:
             user = User.objects.filter(email__iexact=value).first()
         else:
             user = User.objects.filter(username__iexact=value).first()
 
-        # security: always behave success
         if not user or not user.email:
             return
 
@@ -57,14 +55,15 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         token = default_token_generator.make_token(user)
 
         frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
-
-        if not frontend_url and request:
-            frontend_url = request.build_absolute_uri("/").rstrip("/")
+        if not frontend_url:
+            if request:
+                frontend_url = request.build_absolute_uri("/").rstrip("/")
+            else:
+                return
 
         reset_link = f"{frontend_url}/reset-password/{uid}/{token}"
 
         subject = "Reset your password"
-
         ctx = {
             "user": user,
             "reset_link": reset_link,
@@ -72,38 +71,30 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         }
 
         try:
-            text_body = render_to_string(
-                "accounts/password_reset_email.txt", ctx
-            )
+            text_body = render_to_string("accounts/password_reset_email.txt", ctx)
         except Exception:
             text_body = f"Use this link to reset your password: {reset_link}"
 
         try:
-            html_body = render_to_string(
-                "accounts/password_reset_email.html", ctx
-            )
+            html_body = render_to_string("accounts/password_reset_email.html", ctx)
         except Exception:
             html_body = f"<p>Use this link to reset your password:</p><p><a href='{reset_link}'>{reset_link}</a></p>"
 
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=text_body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[user.email],
-        )
-
-        msg.attach_alternative(html_body, "text/html")
-
-        # IMPORTANT: show errors instead of hiding them
-        import logging
-        logger = logging.getLogger(__name__)
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "no-reply@example.com"
 
         try:
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=text_body,
+                from_email=from_email,
+                to=[user.email],
+            )
+            msg.attach_alternative(html_body, "text/html")
             msg.send(fail_silently=False)
-            logger.info(f"Password reset email sent to {user.email}")
-        except Exception as e:
-            logger.exception(f"Password reset email FAILED for {user.email}")
-            raise e
+        except Exception:
+            # Do not break the API response
+            logger.exception("Password reset email FAILED for %s", user.email)
+            return
 class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password1 = serializers.CharField(min_length=8, write_only=True)
     new_password2 = serializers.CharField(min_length=8, write_only=True)

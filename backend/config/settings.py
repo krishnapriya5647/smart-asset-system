@@ -15,13 +15,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv()
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-key")
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 
-# Important: include your Render domain in DJANGO_ALLOWED_HOSTS env
 ALLOWED_HOSTS = [
     h.strip()
     for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
@@ -40,10 +36,14 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
-    "anymail",  # Resend (email)
+
+    # Email via API (Resend)
+    "anymail",
+
     "accounts",
     "core",
     "notifications",
@@ -52,8 +52,10 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -80,7 +82,6 @@ TEMPLATES = [
     },
 ]
 
-# Database (Neon/Render)
 DATABASES = {
     "default": dj_database_url.config(
         default=os.getenv("DATABASE_URL", ""),
@@ -111,7 +112,6 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# Static files
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
@@ -124,10 +124,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Frontend URL (for emails/links)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://smart-asset-andinventorysystem.vercel.app").rstrip("/")
 
-# CORS
 CORS_ALLOWED_ORIGINS = [
     "https://smart-asset-andinventorysystem.vercel.app",
 ]
@@ -137,19 +135,22 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 
 CORS_ALLOW_CREDENTIALS = False
-
-CORS_ALLOW_HEADERS = list(default_headers) + [
-    "authorization",
-]
+CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
 
 PASSWORD_RESET_TIMEOUT = 60 * 60
 
-# Email via Resend (works on Render; SMTP gets blocked)
+# ---------------------------
+# EMAIL (Resend via Anymail)
+# ---------------------------
 EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
 
+# Set this in Render Environment:
+# RESEND_API_KEY = your_resend_api_key
 ANYMAIL = {
     "RESEND_API_KEY": os.getenv("RESEND_API_KEY", ""),
 }
 
-# Use Resend test sender until you verify a domain
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "onboarding@resend.dev")
+# This MUST be a verified sender/domain in Resend
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@yourdomain.com")
+
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))

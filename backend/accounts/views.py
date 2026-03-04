@@ -49,14 +49,17 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class PasswordResetRequestView(APIView):
-    permission_classes = []  # public
+    permission_classes = []
 
     def post(self, request):
-        ser = PasswordResetRequestSerializer(data=request.data, context={"request": request})
-        ser.is_valid(raise_exception=True)
-        ser.save()
+        serializer = PasswordResetRequestSerializer(
+            data=request.data,
+            context={"request": request}
+        )
 
-        # Always return same message (security)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
         return Response(
             {"detail": "If that account exists, we sent password reset instructions."},
             status=status.HTTP_200_OK,
@@ -64,13 +67,18 @@ class PasswordResetRequestView(APIView):
 
 
 class PasswordResetConfirmView(APIView):
-    permission_classes = []  # public
+    permission_classes = []
 
-    def post(self, request, uidb64: str, token: str):
-        ser = PasswordResetConfirmSerializer(
+    def post(self, request, uidb64, token):
+        serializer = PasswordResetConfirmSerializer(
             data=request.data,
             context={"uidb64": uidb64, "token": token},
         )
-        ser.is_valid(raise_exception=True)
-        ser.save()
-        return Response({"detail": "Password reset successful. Please login."}, status=status.HTTP_200_OK)
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {"detail": "Password reset successful. Please login."},
+            status=status.HTTP_200_OK,
+        )

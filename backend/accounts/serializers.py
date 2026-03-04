@@ -43,59 +43,59 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         request = self.context.get("request")
 
         user = None
+
         if "@" in value:
             user = User.objects.filter(email__iexact=value).first()
         else:
             user = User.objects.filter(username__iexact=value).first()
 
-        # Always act success (security best practice)
-        if not user:
-            return
-
-        # Cannot send if no email
-        if not user.email:
+        # security: always behave success
+        if not user or not user.email:
             return
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
 
         frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
-        if not frontend_url:
-            # fallback if not configured
-            if request:
-                frontend_url = request.build_absolute_uri("/").rstrip("/")
-            else:
-                return
+
+        if not frontend_url and request:
+            frontend_url = request.build_absolute_uri("/").rstrip("/")
 
         reset_link = f"{frontend_url}/reset-password/{uid}/{token}"
 
         subject = "Reset your password"
+
         ctx = {
             "user": user,
             "reset_link": reset_link,
             "app_name": getattr(settings, "APP_NAME", "Smart Asset System"),
         }
 
-        # You can use templates (recommended). If missing, fallback to a simple text.
         try:
-            text_body = render_to_string("accounts/password_reset_email.txt", ctx)
+            text_body = render_to_string(
+                "accounts/password_reset_email.txt", ctx
+            )
         except Exception:
             text_body = f"Use this link to reset your password: {reset_link}"
 
         try:
-            html_body = render_to_string("accounts/password_reset_email.html", ctx)
+            html_body = render_to_string(
+                "accounts/password_reset_email.html", ctx
+            )
         except Exception:
             html_body = f"<p>Use this link to reset your password:</p><p><a href='{reset_link}'>{reset_link}</a></p>"
 
         msg = EmailMultiAlternatives(
             subject=subject,
             body=text_body,
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+            from_email=settings.DEFAULT_FROM_EMAIL,
             to=[user.email],
         )
-        msg.attach_alternative(html_body, "text/html")
-        msg.send(fail_silently=True)
 
+        msg.attach_alternative(html_body, "text/html")
+
+        # IMPORTANT: show errors instead of hiding them
+        msg.send(fail_silently=False)
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password1 = serializers.CharField(min_length=8, write_only=True)
@@ -103,7 +103,9 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs["new_password1"] != attrs["new_password2"]:
-            raise serializers.ValidationError({"new_password2": "Passwords do not match."})
+            raise serializers.ValidationError(
+                {"new_password2": "Passwords do not match."}
+            )
         return attrs
 
     def save(self):
@@ -114,11 +116,16 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             uid = force_str(urlsafe_base64_decode(uidb64))
             user = User.objects.get(pk=uid)
         except Exception:
-            raise serializers.ValidationError({"detail": "Invalid reset link."})
+            raise serializers.ValidationError(
+                {"detail": "Invalid reset link."}
+            )
 
         if not default_token_generator.check_token(user, token):
-            raise serializers.ValidationError({"detail": "Reset link is invalid or expired."})
+            raise serializers.ValidationError(
+                {"detail": "Reset link is invalid or expired."}
+            )
 
         user.set_password(self.validated_data["new_password1"])
         user.save(update_fields=["password"])
+
         return user

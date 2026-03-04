@@ -95,8 +95,15 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         msg.attach_alternative(html_body, "text/html")
 
         # IMPORTANT: show errors instead of hiding them
-        msg.send(fail_silently=False)
+        import logging
+        logger = logging.getLogger(__name__)
 
+        try:
+            msg.send(fail_silently=False)
+            logger.info(f"Password reset email sent to {user.email}")
+        except Exception as e:
+            logger.exception(f"Password reset email FAILED for {user.email}")
+            raise e
 class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password1 = serializers.CharField(min_length=8, write_only=True)
     new_password2 = serializers.CharField(min_length=8, write_only=True)

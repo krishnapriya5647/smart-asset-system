@@ -86,8 +86,12 @@ DATABASES = {
     "default": dj_database_url.config(
         default=os.getenv("DATABASE_URL", ""),
         conn_max_age=600,
+        ssl_require=True,       
     )
 }
+
+DATABASES["default"].setdefault("OPTIONS", {})
+DATABASES["default"]["OPTIONS"].update({"connect_timeout": 5})
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -139,18 +143,18 @@ CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
 
 PASSWORD_RESET_TIMEOUT = 60 * 60
 
-# ---------------------------
-# EMAIL (Resend via Anymail)
-# ---------------------------
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "anymail.backends.resend.EmailBackend")
+# Email (Resend via django-anymail)
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
 
-# Set this in Render Environment:
-# RESEND_API_KEY = your_resend_api_key
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    "onboarding@resend.dev",
+)
+
 ANYMAIL = {
     "RESEND_API_KEY": os.getenv("RESEND_API_KEY", ""),
 }
-
-# This MUST be a verified sender/domain in Resend
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "onboarding@resend.dev")
-
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))

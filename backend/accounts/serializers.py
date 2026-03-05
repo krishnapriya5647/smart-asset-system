@@ -36,6 +36,24 @@ class MeUpdateSerializer(serializers.ModelSerializer):
 
 
 
+# accounts/serializers.py
+
+import logging
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from rest_framework import serializers
+
+logger = logging.getLogger(__name__)
+
+User = get_user_model()
+
+
 class PasswordResetRequestSerializer(serializers.Serializer):
     email_or_username = serializers.CharField()
 
@@ -43,12 +61,18 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         value = self.validated_data["email_or_username"].strip()
         request = self.context.get("request")
 
+        user = None
         if "@" in value:
             user = User.objects.filter(email__iexact=value).first()
         else:
             user = User.objects.filter(username__iexact=value).first()
 
-        if not user or not user.email:
+        # Always act success (security best practice)
+        if not user:
+            return
+
+        # Cannot send if no email
+        if not user.email:
             return
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
@@ -56,6 +80,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
         frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
         if not frontend_url:
+            # fallback if not configured
             if request:
                 frontend_url = request.build_absolute_uri("/").rstrip("/")
             else:
@@ -70,6 +95,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
             "app_name": getattr(settings, "APP_NAME", "Smart Asset System"),
         }
 
+        # You can use templates (recommended). If missing, fallback to a simple text.
         try:
             text_body = render_to_string("accounts/password_reset_email.txt", ctx)
         except Exception:
@@ -78,32 +104,34 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         try:
             html_body = render_to_string("accounts/password_reset_email.html", ctx)
         except Exception:
-            html_body = f"<p>Use this link to reset your password:</p><p><a href='{reset_link}'>{reset_link}</a></p>"
+            html_body = (
+                f"<p>Use this link to reset your password:</p>"
+                f"<p><a href='{reset_link}'>{reset_link}</a></p>"
+            )
 
-        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "no-reply@example.com"
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=text_body,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+            to=[user.email],
+        )
+        msg.attach_alternative(html_body, "text/html")
 
         try:
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=text_body,
-                from_email=from_email,
-                to=[user.email],
-            )
-            msg.attach_alternative(html_body, "text/html")
             msg.send(fail_silently=False)
+            logger.info("Password reset email sent to %s", user.email)
         except Exception:
-            # Do not break the API response
             logger.exception("Password reset email FAILED for %s", user.email)
-            return
+            # keep API response generic for security, so don't raise
+
+
 class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password1 = serializers.CharField(min_length=8, write_only=True)
     new_password2 = serializers.CharField(min_length=8, write_only=True)
 
     def validate(self, attrs):
         if attrs["new_password1"] != attrs["new_password2"]:
-            raise serializers.ValidationError(
-                {"new_password2": "Passwords do not match."}
-            )
+            raise serializers.ValidationError({"new_password2": "Passwords do not match."})
         return attrs
 
     def save(self):
@@ -114,16 +142,11 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             uid = force_str(urlsafe_base64_decode(uidb64))
             user = User.objects.get(pk=uid)
         except Exception:
-            raise serializers.ValidationError(
-                {"detail": "Invalid reset link."}
-            )
+            raise serializers.ValidationError({"detail": "Invalid reset link."})
 
         if not default_token_generator.check_token(user, token):
-            raise serializers.ValidationError(
-                {"detail": "Reset link is invalid or expired."}
-            )
+            raise serializers.ValidationError({"detail": "Reset link is invalid or expired."})
 
         user.set_password(self.validated_data["new_password1"])
         user.save(update_fields=["password"])
-
         return user

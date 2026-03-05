@@ -142,7 +142,7 @@ PASSWORD_RESET_TIMEOUT = 60 * 60
 # ---------------------------
 # EMAIL (Resend via Anymail)
 # ---------------------------
-EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "anymail.backends.resend.EmailBackend")
 
 # Set this in Render Environment:
 # RESEND_API_KEY = your_resend_api_key
@@ -151,6 +151,6 @@ ANYMAIL = {
 }
 
 # This MUST be a verified sender/domain in Resend
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@yourdomain.com")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "onboarding@resend.dev")
 
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))

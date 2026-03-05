@@ -24,13 +24,13 @@ const baseURL = normalizeBaseURL(
 export const api = axios.create({
   baseURL,
   // optional but nice: avoid hanging forever
-  timeout: 60000,
+  timeout: 120000,
 });
 
 // Separate client without interceptors for refresh
 const raw = axios.create({
   baseURL,
-  timeout: 60000,
+  timeout: 120000,
 });
 
 type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };

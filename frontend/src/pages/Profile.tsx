@@ -234,38 +234,115 @@ export default function Profile() {
   };
 
   return (
-    <Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+    <Box sx={{ pt: { xs: 1.5, sm: 0.75 } }}>
+      <Stack spacing={{ xs: 1.5, sm: 1.75 }} sx={{ mb: { xs: 2.25, sm: 2 } }}>
+        <Box sx={{ mt: { xs: 0.5, sm: 0 } }}>
+          <Typography
+            sx={{
+              fontSize: { xs: 22, sm: 30 },
+              fontWeight: 700,
+              lineHeight: 1.15,
+              mb: 0.4,
+            }}
+          >
             Profile
           </Typography>
-          <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+
+          <Typography
+            sx={{
+              color: "text.secondary",
+              fontSize: { xs: 14, sm: 13.5 },
+              maxWidth: { xs: "100%", sm: 460 },
+            }}
+          >
             Manage your account details and session.
           </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1}>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={refresh} disabled={isFetching}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: { xs: 1, sm: 1.25 },
+            width: "100%",
+            maxWidth: { xs: "100%", sm: 560 },
+          }}
+        >
+          <Button
+            variant="outlined"
+            onClick={refresh}
+            disabled={isFetching}
+            startIcon={<RefreshIcon />}
+            sx={{
+              minWidth: 0,
+              textTransform: "none",
+              borderRadius: 3,
+              fontWeight: 700,
+              fontSize: { xs: 11.5, sm: 13 },
+              px: { xs: 1, sm: 1.75 },
+              py: { xs: 1.1, sm: 1.2 },
+              whiteSpace: "nowrap",
+              "& .MuiButton-startIcon": {
+                mr: { xs: 0.5, sm: 0.75 },
+              },
+            }}
+          >
             {isFetching ? "Refreshing..." : "Refresh"}
           </Button>
 
-          <Button variant="outlined" startIcon={<EditIcon />} onClick={openEdit} disabled={!data}>
-            Edit Profile
+          <Button
+            variant="outlined"
+            onClick={openEdit}
+            disabled={!data}
+            startIcon={<EditIcon />}
+            sx={{
+              minWidth: 0,
+              textTransform: "none",
+              borderRadius: 3,
+              fontWeight: 700,
+              fontSize: { xs: 11.5, sm: 13 },
+              px: { xs: 1, sm: 1.75 },
+              py: { xs: 1.1, sm: 1.2 },
+              whiteSpace: "nowrap",
+              "& .MuiButton-startIcon": {
+                mr: { xs: 0.5, sm: 0.75 },
+              },
+            }}
+          >
+            Edit
           </Button>
 
-          <Button color="error" variant="contained" startIcon={<LogoutIcon />} onClick={logout}>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={logout}
+            startIcon={<LogoutIcon />}
+            sx={{
+              minWidth: 0,
+              textTransform: "none",
+              borderRadius: 3,
+              fontWeight: 700,
+              fontSize: { xs: 11.5, sm: 13 },
+              px: { xs: 1, sm: 1.75 },
+              py: { xs: 1.1, sm: 1.2 },
+              whiteSpace: "nowrap",
+              boxShadow: "none",
+              "& .MuiButton-startIcon": {
+                mr: { xs: 0.5, sm: 0.75 },
+              },
+            }}
+          >
             Logout
           </Button>
-        </Stack>
+        </Box>
       </Stack>
 
-      <Card sx={{ borderRadius: 3, maxWidth: 820 }}>
-        <CardContent>
+      <Card sx={{ borderRadius: 4, maxWidth: 920 }}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
           {isLoading ? (
             <Typography sx={{ color: "text.secondary" }}>Loading profile...</Typography>
           ) : isError || !data ? (
-            <Stack spacing={1}>
+            <Stack spacing={1.5}>
               <Typography sx={{ color: "error.main", fontWeight: 600 }}>Failed to load profile</Typography>
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 <Button variant="outlined" onClick={refresh}>
@@ -277,57 +354,143 @@ export default function Profile() {
               </Stack>
             </Stack>
           ) : (
-            <Stack spacing={2.2}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
-                <Avatar sx={{ width: 64, height: 64, fontWeight: 700 }} src={avatarSrc ?? undefined}>
+            <Stack spacing={{ xs: 2.5, sm: 2.8 }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 2, sm: 2.5 }} alignItems={{ xs: "center", sm: "center" }}>
+                <Avatar
+                  sx={{ width: { xs: 92, sm: 78 }, height: { xs: 92, sm: 78 }, fontWeight: 700, fontSize: { xs: 28, sm: 24 } }}
+                  src={avatarSrc ?? undefined}
+                >
                   {!avatarSrc ? avatarText : null}
                 </Avatar>
 
-                <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
-                    alignItems={{ xs: "flex-start", sm: "center" }}
-                    spacing={1}
-                    sx={{ mb: 0.5 }}
+                    alignItems={{ xs: "center", sm: "center" }}
+                    justifyContent="space-between"
+                    spacing={{ xs: 1.2, sm: 1.5 }}
                   >
-                    <Typography variant="h6" sx={{ fontWeight: 700 }} noWrap>
-                      {fullName}
-                    </Typography>
-                    <Chip size="small" label={roleLabel} sx={{ fontWeight: 600 }} />
-                  </Stack>
-
-                  <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-                    User ID: <b>{data.id}</b> • Last refreshed: <b>{refreshedAt.toLocaleString()}</b>
-                  </Typography>
-
-                  <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-                    <Button size="small" variant="outlined" onClick={goMyTickets}>
-                      View Tickets
-                    </Button>
-                    <Button size="small" variant="outlined" onClick={goMyAssignments}>
-                      View Assignments
-                    </Button>
-                    <Button size="small" variant="outlined" onClick={goMyAssets}>
-                      View Assets
-                    </Button>
-                  </Stack>
-                </Box>
-
-                <Box>
-                  <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFileChange} />
-
-                  <Tooltip title="Upload a JPG/PNG up to 3MB">
-                    <span>
-                      <Button
-                        variant="outlined"
-                        startIcon={<PhotoCameraIcon />}
-                        onClick={pickPhoto}
-                        disabled={uploadAvatarMut.isPending}
+                    <Box sx={{ minWidth: 0, width: "100%" }}>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        alignItems={{ xs: "center", sm: "center" }}
+                        spacing={1}
+                        sx={{ mb: 0.75 }}
                       >
-                        {uploadAvatarMut.isPending ? "Uploading..." : "Change photo"}
+                        <Typography
+                          sx={{
+                            fontSize: { xs: 18, sm: 24 },
+                            fontWeight: 700,
+                            lineHeight: 1.2,
+                            textAlign: { xs: "center", sm: "left" },
+                          }}
+                        >
+                          {fullName}
+                        </Typography>
+
+                        <Chip size="small" label={roleLabel} sx={{ fontWeight: 700 }} />
+                      </Stack>
+
+                      <Typography
+                        sx={{
+                          color: "text.secondary",
+                          fontSize: { xs: 12.5, sm: 13.5 },
+                          textAlign: { xs: "center", sm: "left" },
+                        }}
+                      >
+                        User ID: <b>{data.id}</b> • Last refreshed: <b>{refreshedAt.toLocaleString()}</b>
+                      </Typography>
+                    </Box>
+                  </Stack>
+
+                  <Box sx={{ mt: { xs: 2, sm: 1.75 } }}>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                        gap: { xs: 1, sm: 1.25 },
+                      }}
+                    >
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={goMyTickets}
+                        sx={{
+                          minWidth: 0,
+                          textTransform: "none",
+                          borderRadius: 3,
+                          fontWeight: 700,
+                          fontSize: { xs: 11, sm: 12.5 },
+                          px: { xs: 0.8, sm: 1.2 },
+                          py: { xs: 0.95, sm: 1 },
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        View Tickets
                       </Button>
-                    </span>
-                  </Tooltip>
+
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={goMyAssignments}
+                        sx={{
+                          minWidth: 0,
+                          textTransform: "none",
+                          borderRadius: 3,
+                          fontWeight: 700,
+                          fontSize: { xs: 11, sm: 12.5 },
+                          px: { xs: 0.8, sm: 1.2 },
+                          py: { xs: 0.95, sm: 1 },
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Assignments
+                      </Button>
+
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={goMyAssets}
+                        sx={{
+                          minWidth: 0,
+                          textTransform: "none",
+                          borderRadius: 3,
+                          fontWeight: 700,
+                          fontSize: { xs: 11, sm: 12.5 },
+                          px: { xs: 0.8, sm: 1.2 },
+                          py: { xs: 0.95, sm: 1 },
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        View Assets
+                      </Button>
+                    </Box>
+
+                    <Box sx={{ display: "flex", justifyContent: { xs: "center", sm: "flex-start" }, mt: { xs: 1.5, sm: 1.4 } }}>
+                      <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFileChange} />
+
+                      <Tooltip title="Upload a JPG/PNG up to 3MB">
+                        <span>
+                          <Button
+                            variant="outlined"
+                            startIcon={<PhotoCameraIcon />}
+                            onClick={pickPhoto}
+                            disabled={uploadAvatarMut.isPending}
+                            sx={{
+                              textTransform: "none",
+                              borderRadius: 3,
+                              fontWeight: 700,
+                              fontSize: { xs: 12.5, sm: 13.5 },
+                              px: { xs: 2, sm: 2.2 },
+                              py: { xs: 1.05, sm: 1.1 },
+                            }}
+                          >
+                            {uploadAvatarMut.isPending ? "Uploading..." : "Change Photo"}
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    </Box>
+                  </Box>
                 </Box>
               </Stack>
 
@@ -341,20 +504,27 @@ export default function Profile() {
               <Divider />
 
               <Box>
-                <Typography sx={{ fontWeight: 700, mb: 1 }}>Account</Typography>
+                <Typography sx={{ fontWeight: 700, mb: 1.5, fontSize: { xs: 16, sm: 18 } }}>
+                  Account
+                </Typography>
 
-                <Stack spacing={1.2}>
+                <Stack spacing={{ xs: 1.35, sm: 1.4 }}>
                   <Stack
                     direction="row"
                     alignItems="center"
                     justifyContent="space-between"
-                    sx={{ p: 1.2, borderRadius: 2, border: "1px solid rgba(0,0,0,0.08)" }}
+                    sx={{
+                      p: { xs: 1.35, sm: 1.5 },
+                      borderRadius: 3,
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      gap: 1.25,
+                    }}
                   >
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
                       <EmailIcon fontSize="small" />
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 12, color: "text.secondary" }}>Email</Typography>
-                        <Typography sx={{ fontWeight: 600 }} noWrap>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.15 }}>Email</Typography>
+                        <Typography sx={{ fontWeight: 600, fontSize: { xs: 14, sm: 15 } }} noWrap>
                           {safeText(data.email)}
                         </Typography>
                       </Box>
@@ -377,13 +547,18 @@ export default function Profile() {
                     direction="row"
                     alignItems="center"
                     justifyContent="space-between"
-                    sx={{ p: 1.2, borderRadius: 2, border: "1px solid rgba(0,0,0,0.08)" }}
+                    sx={{
+                      p: { xs: 1.35, sm: 1.5 },
+                      borderRadius: 3,
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      gap: 1.25,
+                    }}
                   >
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
                       <PersonIcon fontSize="small" />
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 12, color: "text.secondary" }}>Username</Typography>
-                        <Typography sx={{ fontWeight: 600 }} noWrap>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.15 }}>Username</Typography>
+                        <Typography sx={{ fontWeight: 600, fontSize: { xs: 14, sm: 15 } }} noWrap>
                           {safeText(data.username)}
                         </Typography>
                       </Box>
@@ -406,19 +581,24 @@ export default function Profile() {
                     direction="row"
                     alignItems="center"
                     justifyContent="space-between"
-                    sx={{ p: 1.2, borderRadius: 2, border: "1px solid rgba(0,0,0,0.08)" }}
+                    sx={{
+                      p: { xs: 1.35, sm: 1.5 },
+                      borderRadius: 3,
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      gap: 1.25,
+                    }}
                   >
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
                       <BadgeIcon fontSize="small" />
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 12, color: "text.secondary" }}>Access level</Typography>
-                        <Typography sx={{ fontWeight: 600 }} noWrap>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.15 }}>Access level</Typography>
+                        <Typography sx={{ fontWeight: 600, fontSize: { xs: 14, sm: 15 } }} noWrap>
                           {roleLabel}
                         </Typography>
                       </Box>
                     </Stack>
 
-                    <Chip size="small" label={data.role} sx={{ fontWeight: 700 }} />
+                    <Chip size="small" label={data.role} sx={{ fontWeight: 700, flexShrink: 0 }} />
                   </Stack>
                 </Stack>
               </Box>

@@ -477,7 +477,7 @@ export default function App() {
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-                maxWidth: { xs: 140, sm: 360, md: "100%" },
+                maxWidth: { xs: 110, sm: 340, md: "100%" },
               }}
             >
               {me ? `Hi, welcome back ${me.username}.` : ""}

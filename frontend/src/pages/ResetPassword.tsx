@@ -59,10 +59,10 @@ export default function ResetPassword() {
     setErrMsg(null);
 
     try {
-      await api.post(`/api/auth/password-reset-confirm/${uid}/${token}/`, {
-        new_password1: p1,
-        new_password2: p2,
-      });
+    await api.post(`/api/auth/password-reset/${uid}/${token}/`, {
+      new_password1: p1,
+      new_password2: p2,
+    });
       setOkMsg("Password updated. You can sign in now.");
       setTimeout(() => navigate("/login"), 800);
     } catch (e: unknown) {

@@ -59,14 +59,9 @@ type NotificationItem = {
   type?: string;
   created_at?: string;
   created?: string;
-
-  // backend read fields
   read_at?: string | null;
   is_read?: boolean | null;
-
-  // legacy fields (some APIs use these)
   read?: boolean;
-
   url?: string;
   link?: string;
 };
@@ -106,7 +101,6 @@ function getBody(n: NotificationItem) {
 }
 
 function isRead(n: NotificationItem) {
-  // IMPORTANT: backend marks read using read_at
   if (n.read_at) return true;
   if (typeof n.is_read === "boolean") return n.is_read;
   if (typeof n.read === "boolean") return n.read;
@@ -125,7 +119,7 @@ export default function App() {
   const qc = useQueryClient();
 
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isTabletOrDown = useMediaQuery(theme.breakpoints.down("md"));
 
   const tokens = tokenStore.get();
 
@@ -145,6 +139,7 @@ export default function App() {
   }, [sidebarOpen]);
 
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   const drawerWidthDesktop = sidebarOpen ? DRAWER_OPEN_WIDTH : DRAWER_CLOSED_WIDTH;
 
@@ -164,8 +159,6 @@ export default function App() {
     tokenStore.clear();
     navigate("/login", { replace: true });
   };
-
-  const [notifOpen, setNotifOpen] = useState(false);
 
   const { data: notifications, isLoading: notifLoading } = useQuery({
     queryKey: ["notifications"],
@@ -224,18 +217,16 @@ export default function App() {
 
   const markAllReadMut = useMutation({
     mutationFn: async () => {
-      // try the bulk endpoint first
       try {
         return await api.post(`/api/notifications/mark-all-read/`, {});
       } catch {
-        // fallback: patch each unread
         const list = notifications ?? [];
         const unread = list.filter((n) => !isRead(n));
         for (const n of unread) {
           try {
             await api.patch(`/api/notifications/${n.id}/`, { read: true });
           } catch {
-            // ignore single notification failure
+            // ignore
           }
         }
         return null;
@@ -317,7 +308,7 @@ export default function App() {
               <AppsRoundedIcon fontSize="small" />
             </Box>
 
-            {isMobile ? (
+            {isTabletOrDown ? (
               <Box sx={{ minWidth: 0 }}>
                 <Typography sx={{ fontWeight: 700, lineHeight: 1.1 }} noWrap>
                   Smart Asset System
@@ -335,7 +326,7 @@ export default function App() {
             ) : null}
           </Stack>
 
-          {isMobile ? (
+          {isTabletOrDown ? (
             <Tooltip title="Close">
               <IconButton
                 size="small"
@@ -352,11 +343,7 @@ export default function App() {
                 onClick={() => setSidebarOpen((v) => !v)}
                 sx={{ borderRadius: 2 }}
               >
-                {sidebarOpen ? (
-                  <ChevronLeftRoundedIcon />
-                ) : (
-                  <ChevronRightRoundedIcon />
-                )}
+                {sidebarOpen ? <ChevronLeftRoundedIcon /> : <ChevronRightRoundedIcon />}
               </IconButton>
             </Tooltip>
           )}
@@ -375,8 +362,8 @@ export default function App() {
             sx={{
               borderRadius: 2,
               mb: 0.5,
-              minHeight: 44,
-              justifyContent: !isMobile && !sidebarOpen ? "center" : "initial",
+              minHeight: 46,
+              justifyContent: !isTabletOrDown && !sidebarOpen ? "center" : "initial",
               px: 1.25,
               "&.active": {
                 bgcolor:
@@ -389,14 +376,14 @@ export default function App() {
             <ListItemIcon
               sx={{
                 minWidth: 0,
-                mr: !isMobile && !sidebarOpen ? 0 : 1.5,
+                mr: !isTabletOrDown && !sidebarOpen ? 0 : 1.5,
                 justifyContent: "center",
                 color: "inherit",
               }}
             >
               {it.icon}
             </ListItemIcon>
-            {!isMobile && !sidebarOpen ? null : <ListItemText primary={it.label} />}
+            {!isTabletOrDown && !sidebarOpen ? null : <ListItemText primary={it.label} />}
           </ListItemButton>
         ))}
       </List>
@@ -419,7 +406,7 @@ export default function App() {
               {initialsFromUsername(me?.username)}
             </Avatar>
 
-            {!isMobile && !sidebarOpen ? null : (
+            {!isTabletOrDown && !sidebarOpen ? null : (
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography sx={{ fontWeight: 700, fontSize: 13 }} noWrap>
                   {me?.username ?? "User"}
@@ -453,9 +440,15 @@ export default function App() {
               : "1px solid rgba(0,0,0,0.08)",
         }}
       >
-        <Toolbar sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {isMobile ? (
+        <Toolbar
+          sx={{
+            minHeight: { xs: 62, sm: 66 },
+            px: { xs: 1.25, sm: 2 },
+            gap: { xs: 0.75, sm: 1.25 },
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+            {isTabletOrDown ? (
               <IconButton
                 onClick={() => setMobileDrawerOpen(true)}
                 sx={{ borderRadius: 2 }}
@@ -473,60 +466,68 @@ export default function App() {
               display: "flex",
               justifyContent: "center",
               textAlign: "center",
-              px: 2,
+              px: { xs: 0.5, sm: 2 },
             }}
           >
             <Typography
               sx={{
                 color: "text.secondary",
-                fontSize: 14,
+                fontSize: { xs: 13, sm: 14 },
+                fontWeight: 500,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-                maxWidth: "100%",
+                maxWidth: { xs: 140, sm: 360, md: "100%" },
               }}
             >
-              {me ? `Hi, welcome ${me.username}.` : ""}
+              {me ? `Hi, welcome back ${me.username}.` : ""}
             </Typography>
           </Box>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: { xs: 0.4, sm: 1 },
+              flexShrink: 0,
+            }}
+          >
             <Tooltip title={mode === "dark" ? "Switch to light" : "Switch to dark"}>
-              <IconButton onClick={toggleTheme} sx={{ borderRadius: 2 }} size="small">
-                {mode === "dark" ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
+              <IconButton onClick={toggleTheme} sx={{ borderRadius: 2, p: { xs: 0.7, sm: 1 } }} size="small">
+                {mode === "dark" ? (
+                  <LightModeRoundedIcon sx={{ fontSize: { xs: 21, sm: 23 } }} />
+                ) : (
+                  <DarkModeRoundedIcon sx={{ fontSize: { xs: 21, sm: 23 } }} />
+                )}
               </IconButton>
             </Tooltip>
 
             <Tooltip title="Notifications">
               <IconButton
                 onClick={() => setNotifOpen(true)}
-                sx={{ borderRadius: 2 }}
+                sx={{ borderRadius: 2, p: { xs: 0.7, sm: 1 } }}
                 size="small"
               >
-                <Badge
-                  badgeContent={unreadCount}
-                  color="primary"
-                  invisible={unreadCount === 0}
-                >
-                  <NotificationsNoneRoundedIcon />
+                <Badge badgeContent={unreadCount} color="primary" invisible={unreadCount === 0}>
+                  <NotificationsNoneRoundedIcon sx={{ fontSize: { xs: 21, sm: 23 } }} />
                 </Badge>
               </IconButton>
             </Tooltip>
 
-            {!isMobile ? (
+            {!isTabletOrDown ? (
               meLoading ? (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, pr: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, pr: 0.5 }}>
                   <CircularProgress size={18} />
                   <Typography sx={{ fontSize: 14, color: "text.secondary" }}>
                     Loading...
                   </Typography>
                 </Box>
               ) : meError ? (
-                <Typography sx={{ fontSize: 14, color: "error.main", pr: 1 }}>
+                <Typography sx={{ fontSize: 14, color: "error.main", pr: 0.5 }}>
                   Session error
                 </Typography>
               ) : (
-                <Typography sx={{ fontWeight: 600, fontSize: 14, pr: 1 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: 14, pr: 0.5, whiteSpace: "nowrap" }}>
                   {me?.username ?? ""} {me ? `(${roleLabel})` : ""}
                 </Typography>
               )
@@ -535,8 +536,17 @@ export default function App() {
             <Button
               variant="outlined"
               onClick={logout}
-              size={isMobile ? "small" : "medium"}
-              sx={{ textTransform: "none" }}
+              size="small"
+              sx={{
+                textTransform: "none",
+                minWidth: { xs: 72, sm: 84 },
+                px: { xs: 1.2, sm: 1.6 },
+                py: { xs: 0.7, sm: 0.85 },
+                borderRadius: 2.5,
+                fontSize: { xs: 12, sm: 13.5 },
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+              }}
             >
               Logout
             </Button>
@@ -544,7 +554,7 @@ export default function App() {
         </Toolbar>
       </AppBar>
 
-      {!isMobile ? (
+      {!isTabletOrDown ? (
         <Drawer
           variant="permanent"
           sx={{
@@ -585,14 +595,13 @@ export default function App() {
           bgcolor: "background.default",
           minHeight: "100vh",
           width: { xs: "100%", md: `calc(100% - ${drawerWidthDesktop}px)` },
-          p: { xs: 2, md: 3 },
+          p: { xs: 1.5, sm: 2, md: 3 },
         }}
       >
         <Toolbar />
         <Outlet />
       </Box>
 
-      {/* Notifications Drawer */}
       <Drawer
         anchor="right"
         open={notifOpen}
@@ -639,7 +648,6 @@ export default function App() {
           </Stack>
         </Box>
 
-        {/* UNREAD ONLY LIST */}
         <Box sx={{ p: 1 }}>
           {notifLoading ? (
             <Box sx={{ p: 2 }}>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Autocomplete,
@@ -114,42 +114,62 @@ function formatIso(iso?: string) {
 function StatCard(props: {
   title: string;
   value: number | string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   onClick?: () => void;
   loading?: boolean;
 }) {
   const { title, value, icon, onClick, loading } = props;
 
   return (
-    <Card sx={{ borderRadius: 3 }}>
+    <Card sx={{ borderRadius: 4, overflow: "hidden" }}>
       <CardActionArea
         onClick={onClick}
         disabled={!onClick}
-        sx={{ borderRadius: 3, height: "100%", alignItems: "stretch" }}
+        sx={{ borderRadius: 4, height: "100%", alignItems: "stretch" }}
       >
-        <CardContent>
-          <Stack direction="row" spacing={1.5} alignItems="center">
+        <CardContent sx={{ p: { xs: 1.5, sm: 2.25 }, "&:last-child": { pb: { xs: 1.5, sm: 2.25 } } }}>
+          <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} alignItems="center">
             <Box
               sx={{
-                width: 42,
-                height: 42,
-                borderRadius: 2,
+                width: { xs: 38, sm: 42 },
+                height: { xs: 38, sm: 42 },
+                borderRadius: 2.5,
                 display: "grid",
                 placeItems: "center",
                 bgcolor: "rgba(0,0,0,0.04)",
+                flexShrink: 0,
               }}
             >
               {icon}
             </Box>
 
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography sx={{ color: "text.secondary", fontSize: 13 }}>{title}</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.4 }}>
-                {loading ? <Skeleton width={70} /> : value}
+              <Typography
+                sx={{
+                  color: "text.secondary",
+                  fontSize: { xs: 12.5, sm: 13.5 },
+                  fontWeight: 500,
+                  lineHeight: 1.3,
+                }}
+              >
+                {title}
+              </Typography>
+
+              <Typography
+                sx={{
+                  fontSize: { xs: 23, sm: 28 },
+                  fontWeight: 700,
+                  mt: 0.45,
+                  lineHeight: 1.1,
+                }}
+              >
+                {loading ? <Skeleton width={56} /> : value}
               </Typography>
             </Box>
 
-            {onClick ? <ArrowForwardIosRoundedIcon sx={{ fontSize: 16, color: "text.secondary" }} /> : null}
+            {onClick ? (
+              <ArrowForwardIosRoundedIcon sx={{ fontSize: { xs: 14, sm: 16 }, color: "text.secondary" }} />
+            ) : null}
           </Stack>
         </CardContent>
       </CardActionArea>
@@ -160,7 +180,7 @@ function StatCard(props: {
 export default function Dashboard() {
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
   const [showAllActivity, setShowAllActivity] = useState(false);
@@ -243,20 +263,33 @@ export default function Dashboard() {
   const assetsToShow = showAllAssets ? myAssets : myAssets.slice(0, collapsedAssetsCount);
 
   return (
-    <Box>
+    <Box sx={{ pt: { xs: 1.5, sm: 1 }, pb: { xs: 1, sm: 0 } }}>
       <Stack
         direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
         alignItems={{ xs: "stretch", md: "center" }}
-        sx={{ mb: 2 }}
-        spacing={1.5}
+        sx={{ mb: { xs: 2.25, sm: 2 } }}
+        spacing={{ xs: 1.5, sm: 1.5 }}
       >
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+        <Box sx={{ mt: { xs: 0.5, sm: 0 } }}>
+          <Typography
+            sx={{
+              fontSize: { xs: 22, sm: 28 },
+              fontWeight: 700,
+              lineHeight: 1.15,
+            }}
+          >
             Dashboard
           </Typography>
 
-          <Typography sx={{ color: "text.secondary", fontSize: 13, fontWeight: 400  }}>
+          <Typography
+            sx={{
+              color: "text.secondary",
+              fontSize: { xs: 14, sm: 13.5 },
+              fontWeight: 400,
+              mt: 0.4,
+            }}
+          >
             Overview of assets, inventory, and tickets
           </Typography>
         </Box>
@@ -305,9 +338,13 @@ export default function Dashboard() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
-          gap: 2,
-          mb: 2,
+          gridTemplateColumns: {
+            xs: "repeat(2, minmax(0, 1fr))",
+            sm: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(4, minmax(0, 1fr))",
+          },
+          gap: { xs: 1.5, sm: 2 },
+          mb: { xs: 2.5, sm: 2.25 },
         }}
       >
         <StatCard
@@ -344,17 +381,21 @@ export default function Dashboard() {
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "1.35fr 1fr" },
-          gap: 2,
+          gap: { xs: 2.25, sm: 2 },
           alignItems: "start",
-          mb: 2,
+          mb: { xs: 2.5, sm: 2.25 },
         }}
       >
-        <Card sx={{ borderRadius: 3 }}>
-          <CardContent>
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
-              <Box>
-                <Typography sx={{ fontWeight: 600 }}>Asset Status Breakdown</Typography>
-                <Typography sx={{ color: "text.secondary" }}>Distribution of assets by status.</Typography>
+        <Card sx={{ borderRadius: 4, mt: { xs: 0.25, sm: 0 } }}>
+          <CardContent sx={{ p: { xs: 1.6, sm: 2 } }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.3 }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: { xs: 18, sm: 20 } }}>
+                  Asset Status Breakdown
+                </Typography>
+                <Typography sx={{ color: "text.secondary", fontSize: { xs: 13.5, sm: 14 } }}>
+                  Distribution of assets by status
+                </Typography>
               </Box>
 
               {!statsLoading ? (
@@ -366,7 +407,7 @@ export default function Dashboard() {
 
             {statsLoading ? (
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 220px" }, gap: 2 }}>
-                <Skeleton height={240} />
+                <Skeleton height={isPhone ? 220 : 240} />
                 <Stack spacing={1}>
                   {Array.from({ length: 4 }).map((_, i) => (
                     <Skeleton key={i} height={28} />
@@ -377,7 +418,7 @@ export default function Dashboard() {
               <Typography sx={{ color: "text.secondary" }}>No data.</Typography>
             ) : (
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 220px" }, gap: 2 }}>
-                <Box sx={{ width: "100%", overflowX: "auto" }}>
+                <Box sx={{ width: "100%", overflowX: "auto", pt: { xs: 0.5, sm: 0 } }}>
                   <PieChart
                     series={[
                       {
@@ -388,14 +429,29 @@ export default function Dashboard() {
                         cornerRadius: 4,
                       },
                     ]}
-                    height={240}
+                    height={isPhone ? 220 : 240}
                   />
                 </Box>
 
-                <Box>
-                  <Typography sx={{ fontWeight: 700, mb: 1, fontSize: 13, color: "text.secondary" }}>Status</Typography>
+                <Box sx={{ pt: { xs: 0.5, sm: 0 } }}>
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                      mb: 1,
+                      fontSize: 13,
+                      color: "text.secondary",
+                    }}
+                  >
+                    Status
+                  </Typography>
 
-                  <Stack spacing={1}>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "1fr" },
+                      gap: 1,
+                    }}
+                  >
                     {pieData.map((p) => (
                       <Button
                         key={p.id}
@@ -404,27 +460,43 @@ export default function Dashboard() {
                         onClick={() => navigate(`/assets?status=${encodeURIComponent(String(p.label))}`)}
                         sx={{
                           justifyContent: "space-between",
-                          borderRadius: 2,
+                          borderRadius: 2.5,
                           textTransform: "none",
                           fontWeight: 600,
+                          fontSize: { xs: 12, sm: 13 },
+                          px: { xs: 1.1, sm: 1.4 },
+                          py: { xs: 0.8, sm: 1 },
                         }}
                       >
                         <span>{String(p.label)}</span>
                         <span>{p.value}</span>
                       </Button>
                     ))}
-                  </Stack>
+                  </Box>
                 </Box>
               </Box>
             )}
           </CardContent>
         </Card>
 
-        <Card sx={{ borderRadius: 3 }}>
-          <CardContent>
+        <Card sx={{ borderRadius: 4, mt: { xs: 0.25, sm: 0 } }}>
+          <CardContent sx={{ p: { xs: 1.6, sm: 2 } }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-              <Typography sx={{ fontWeight: 600 }}>Assets snapshot</Typography>
-              <Button size="small" onClick={() => navigate("/assets")} sx={{ fontWeight: 700 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: { xs: 18, sm: 20 } }}>
+                Asset Snapshot
+              </Typography>
+
+              <Button
+                size="small"
+                onClick={() => navigate("/assets")}
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: 11.5, sm: 13 },
+                  minWidth: "auto",
+                  px: 0.5,
+                  textTransform: "none",
+                }}
+              >
                 View all assets
               </Button>
             </Stack>
@@ -448,7 +520,7 @@ export default function Dashboard() {
               />
             </Stack>
 
-            <Typography sx={{ color: "text.secondary", mb: 2 }}>
+            <Typography sx={{ color: "text.secondary", mb: 2, fontSize: { xs: 13.5, sm: 14 } }}>
               {isAdmin ? "Use Assets page for full management." : "Assets assigned to you."}
             </Typography>
 
@@ -478,28 +550,32 @@ export default function Dashboard() {
                         onClick={() => navigate(`/assets?focus=${a.id}`)}
                         onKeyDown={(e) => e.key === "Enter" && navigate(`/assets?focus=${a.id}`)}
                         sx={{
-                          py: 1,
-                          px: 1,
-                          borderRadius: 2,
+                          py: { xs: 0.9, sm: 1 },
+                          px: { xs: 0.9, sm: 1 },
+                          borderRadius: 2.5,
                           cursor: "pointer",
                           border: "1px solid rgba(0,0,0,0.06)",
                           mb: 1,
                           "&:hover": { bgcolor: "rgba(25,118,210,0.06)" },
                         }}
                       >
-                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.2}>
                           <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontWeight: 600 }} noWrap>
+                            <Typography sx={{ fontWeight: 600, fontSize: { xs: 13.5, sm: 14.5 } }} noWrap>
                               {a.name} ({a.serial_number})
                             </Typography>
-                            <Typography sx={{ color: "text.secondary", fontSize: 13 }} noWrap>
-                              {a.type ?? "—"}
+                            <Typography sx={{ color: "text.secondary", fontSize: { xs: 12, sm: 13 } }} noWrap>
+                              {a.type ?? "-"}
                             </Typography>
                           </Box>
 
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip size="small" label={a.status} />
-                            <ArrowForwardIosRoundedIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
+                            <Chip
+                              size="small"
+                              label={a.status}
+                              sx={{ "& .MuiChip-label": { px: { xs: 1, sm: 1.25 }, fontSize: { xs: 11, sm: 12 } } }}
+                            />
+                            <ArrowForwardIosRoundedIcon sx={{ fontSize: 13, color: "text.secondary" }} />
                           </Stack>
                         </Stack>
                       </Box>
@@ -509,7 +585,7 @@ export default function Dashboard() {
 
                 {hasMoreAssets ? (
                   <Box sx={{ textAlign: "center", mt: 1 }}>
-                    <Button size="small" onClick={() => setShowAllAssets((v) => !v)}>
+                    <Button size="small" onClick={() => setShowAllAssets((v) => !v)} sx={{ textTransform: "none" }}>
                       {showAllAssets ? "Show less" : "Show more"}
                     </Button>
                   </Box>
@@ -520,29 +596,55 @@ export default function Dashboard() {
         </Card>
       </Box>
 
-      <Card sx={{ borderRadius: 3 }}>
-        <CardContent>
+      <Card sx={{ borderRadius: 4, mt: { xs: 0.25, sm: 0 } }}>
+        <CardContent sx={{ p: { xs: 1.6, sm: 2 } }}>
           <Stack
-            direction={{ xs: "column", md: "row" }}
+            direction="row"
             justifyContent="space-between"
-            alignItems={{ xs: "stretch", md: "center" }}
-            sx={{ mb: 0.5 }}
+            alignItems="center"
+            sx={{ mb: 0.75 }}
             spacing={1}
           >
-            <Typography sx={{ fontWeight: 700 }}>Recent Activity</Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: { xs: 18, sm: 20 } }}>
+              Recent Activity
+            </Typography>
 
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
-              <Button size="small" onClick={() => navigate("/tickets")} sx={{ fontWeight: 700 }}>
+            <Stack direction="row" spacing={{ xs: 1, sm: 1.25 }} alignItems="center" sx={{ flexShrink: 0 }}>
+              <Button
+                size="small"
+                onClick={() => navigate("/tickets")}
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: 10.5, sm: 12.5 },
+                  minWidth: "auto",
+                  px: 0,
+                  textTransform: "none",
+                }}
+              >
                 View all tickets
               </Button>
-              {!isMobile ? <Typography sx={{ color: "text.secondary" }}>|</Typography> : null}
-              <Button size="small" onClick={() => navigate("/assignments")} sx={{ fontWeight: 700 }}>
+
+              <Typography sx={{ color: "text.secondary", fontSize: { xs: 11, sm: 13 } }}>|</Typography>
+
+              <Button
+                size="small"
+                onClick={() => navigate("/assignments")}
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: 10.5, sm: 12.5 },
+                  minWidth: "auto",
+                  px: 0,
+                  textTransform: "none",
+                }}
+              >
                 View all assignments
               </Button>
             </Stack>
           </Stack>
 
-          <Typography sx={{ color: "text.secondary", mb: 2 }}>Latest tickets and assignments.</Typography>
+          <Typography sx={{ color: "text.secondary", mb: 2, fontSize: { xs: 13.5, sm: 14 } }}>
+            Latest tickets and assignments.
+          </Typography>
 
           {recentLoading ? (
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
@@ -568,14 +670,18 @@ export default function Dashboard() {
               <Collapse in={showAllActivity} collapsedSize={activityCollapsedHeight} timeout={280}>
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
                   <Box>
-                    <Typography sx={{ fontWeight: 600, mb: 1 }}>Latest Tickets</Typography>
+                    <Typography sx={{ fontWeight: 700, mb: 1, fontSize: { xs: 16, sm: 17 } }}>
+                      Latest Tickets
+                    </Typography>
+
                     {shownTickets.length === 0 ? (
                       <Typography sx={{ color: "text.secondary" }}>No recent tickets.</Typography>
                     ) : (
-                      <Stack spacing={1.2}>
+                      <Stack spacing={1.1}>
                         {shownTickets.map((t) => {
                           const createdIso = t.created_at ?? t.created;
                           const subtitle = (t.issue ?? "").trim();
+
                           return (
                             <Box
                               key={t.id}
@@ -584,28 +690,38 @@ export default function Dashboard() {
                               onClick={() => navigate(`/tickets?focus=${t.id}`)}
                               onKeyDown={(e) => e.key === "Enter" && navigate(`/tickets?focus=${t.id}`)}
                               sx={{
-                                p: 1.2,
-                                borderRadius: 2,
+                                p: { xs: 1, sm: 1.2 },
+                                borderRadius: 2.5,
                                 cursor: "pointer",
                                 border: "1px solid rgba(0,0,0,0.06)",
                                 "&:hover": { bgcolor: "rgba(25,118,210,0.06)" },
                               }}
                             >
-                              <Stack direction="row" justifyContent="space-between" spacing={2} alignItems="flex-start">
-                                <Box sx={{ minWidth: 0 }}>
-                                  <Typography sx={{ fontWeight: 700 }} noWrap>
+                              <Stack direction="row" justifyContent="space-between" spacing={1.25} alignItems="flex-start">
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                  <Typography sx={{ fontWeight: 700, fontSize: { xs: 13.5, sm: 14.5 } }} noWrap>
                                     {assetLabel(t.asset_detail, t.asset)}
                                   </Typography>
+
                                   {subtitle ? (
-                                    <Typography sx={{ fontSize: 13, color: "text.secondary" }} noWrap>
+                                    <Typography sx={{ fontSize: { xs: 12, sm: 13 }, color: "text.secondary" }} noWrap>
                                       {subtitle}
                                     </Typography>
                                   ) : null}
                                 </Box>
 
-                                <Stack spacing={0.6} alignItems="flex-end">
-                                  <Chip size="small" label={t.status} />
-                                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                                <Stack spacing={0.5} alignItems="flex-end" sx={{ flexShrink: 0 }}>
+                                  <Chip
+                                    size="small"
+                                    label={t.status}
+                                    sx={{
+                                      "& .MuiChip-label": {
+                                        px: { xs: 0.9, sm: 1.1 },
+                                        fontSize: { xs: 10.5, sm: 11.5 },
+                                      },
+                                    }}
+                                  />
+                                  <Typography sx={{ fontSize: { xs: 11, sm: 12 }, color: "text.secondary" }}>
                                     {formatIso(createdIso)}
                                   </Typography>
                                 </Stack>
@@ -617,12 +733,15 @@ export default function Dashboard() {
                     )}
                   </Box>
 
-                  <Box>
-                    <Typography sx={{ fontWeight: 600, mb: 1 }}>Latest Assignments</Typography>
+                  <Box sx={{ mt: { xs: 0.5, md: 0 } }}>
+                    <Typography sx={{ fontWeight: 700, mb: 1, fontSize: { xs: 16, sm: 17 } }}>
+                      Latest Assignments
+                    </Typography>
+
                     {shownAssignments.length === 0 ? (
                       <Typography sx={{ color: "text.secondary" }}>No recent assignments.</Typography>
                     ) : (
-                      <Stack spacing={1.2}>
+                      <Stack spacing={1.1}>
                         {shownAssignments.map((a) => (
                           <Box
                             key={a.id}
@@ -631,20 +750,21 @@ export default function Dashboard() {
                             onClick={() => navigate(`/assignments?focus=${a.id}`)}
                             onKeyDown={(e) => e.key === "Enter" && navigate(`/assignments?focus=${a.id}`)}
                             sx={{
-                              p: 1.2,
-                              borderRadius: 2,
+                              p: { xs: 1, sm: 1.2 },
+                              borderRadius: 2.5,
                               cursor: "pointer",
                               border: "1px solid rgba(0,0,0,0.06)",
                               "&:hover": { bgcolor: "rgba(25,118,210,0.06)" },
                             }}
                           >
-                            <Stack direction="row" justifyContent="space-between" spacing={2} alignItems="flex-start">
-                              <Box sx={{ minWidth: 0 }}>
-                                <Typography sx={{ fontWeight: 700 }} noWrap>
+                            <Stack direction="row" justifyContent="space-between" spacing={1.25} alignItems="flex-start">
+                              <Box sx={{ minWidth: 0, flex: 1 }}>
+                                <Typography sx={{ fontWeight: 700, fontSize: { xs: 13.5, sm: 14.5 } }} noWrap>
                                   {assetLabel(a.asset_detail, a.asset)}
                                 </Typography>
-                                <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-                                  Assigned: {String(a.date_assigned).slice(0, 10)} • Returned:{" "}
+
+                                <Typography sx={{ fontSize: { xs: 12, sm: 13 }, color: "text.secondary" }}>
+                                  Assigned: {String(a.date_assigned).slice(0, 10)} | Returned:{" "}
                                   {a.date_returned ? String(a.date_returned).slice(0, 10) : "Not returned"}
                                 </Typography>
                               </Box>
@@ -660,6 +780,13 @@ export default function Dashboard() {
                                     ? `Employee ${a.employee}`
                                     : "Employee"
                                 }
+                                sx={{
+                                  flexShrink: 0,
+                                  "& .MuiChip-label": {
+                                    px: { xs: 0.9, sm: 1.1 },
+                                    fontSize: { xs: 10.5, sm: 11.5 },
+                                  },
+                                }}
                               />
                             </Stack>
                           </Box>
@@ -672,7 +799,7 @@ export default function Dashboard() {
 
               {hasMoreActivity ? (
                 <Box sx={{ textAlign: "center", mt: 1.5 }}>
-                  <Button size="small" onClick={() => setShowAllActivity((v) => !v)}>
+                  <Button size="small" onClick={() => setShowAllActivity((v) => !v)} sx={{ textTransform: "none" }}>
                     {showAllActivity ? "Show less" : "Show more"}
                   </Button>
                 </Box>
